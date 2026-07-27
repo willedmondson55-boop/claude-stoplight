@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin: 0; box-sizing: border-box; }
+  body {
+    width: 1280px; height: 800px; overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: linear-gradient(135deg, #10131b 0%, #1c2230 55%, #232b3d 100%);
+    color: #e5e7eb;
+    display: flex; align-items: center; justify-content: center; gap: 70px;
+  }
+  .copy { max-width: 470px; }
+  .copy h1 { font-size: 40px; line-height: 1.15; margin-bottom: 18px; }
+  .copy p { font-size: 19px; line-height: 1.5; color: #aab1bf; }
+  .legend { margin-top: 34px; display: flex; flex-direction: column; gap: 14px; }
+  .legend .item { display: flex; align-items: center; gap: 14px; font-size: 17px; }
+  .dot { width: 16px; height: 16px; border-radius: 50%; flex: none; }
+  .g { background: #22c55e; box-shadow: 0 0 10px rgba(34,197,94,.7); }
+  .y { background: #eab308; box-shadow: 0 0 10px rgba(234,179,8,.7); }
+  .r { background: #ef4444; box-shadow: 0 0 10px rgba(239,68,68,.7); }
+  .grey { background: #9ca3af; }
+
+  /* fake browser window */
+  .window {
+    width: 520px; border-radius: 14px; overflow: hidden;
+    box-shadow: 0 30px 80px rgba(0,0,0,.55);
+    background: #fff; position: relative;
+  }
+  .chrome-bar {
+    background: #dee1e6; padding: 10px 12px; display: flex; align-items: center; gap: 8px;
+  }
+  .traffic { display: flex; gap: 6px; margin-right: 6px; }
+  .traffic span { width: 11px; height: 11px; border-radius: 50%; display: block; }
+  .urlbar {
+    flex: 1; background: #fff; border-radius: 14px; padding: 6px 14px;
+    font-size: 12px; color: #5f6368;
+  }
+  .ext-icon {
+    width: 26px; height: 26px; position: relative; flex: none;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .ext-icon img { width: 20px; height: 20px; }
+  .badge {
+    position: absolute; right: -2px; bottom: -2px; width: 12px; height: 9px;
+    background: #eab308; border-radius: 2px; border: 1px solid #dee1e6;
+  }
+  .page { height: 330px; background: #fafafa; padding: 26px 30px; position: relative; }
+  .skeleton { background: #e8eaed; border-radius: 6px; margin-bottom: 14px; }
+
+  /* stoplight overlay */
+  .stoplight {
+    position: absolute; top: 22px; left: 22px;
+    width: 26px; height: 62px; padding: 5px 0; border-radius: 13px;
+    background: #1f2430;
+    box-shadow: 0 4px 14px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.08);
+    display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+  }
+  .lamp { width: 14px; height: 14px; border-radius: 50%; background: #3a4050;
+          box-shadow: inset 0 1px 2px rgba(0,0,0,.5); }
+  .lamp.lit-y { background: #eab308; box-shadow: 0 0 8px 2px rgba(234,179,8,.8); }
+
+  /* popup */
+  .popup {
+    position: absolute; top: 46px; right: 10px; width: 240px;
+    background: #14171f; color: #e5e7eb; border-radius: 10px; overflow: hidden;
+    box-shadow: 0 18px 50px rgba(0,0,0,.5); z-index: 3;
+  }
+  .popup .header { display: flex; align-items: center; gap: 10px; padding: 14px 14px 10px; }
+  .popup .state-dot { width: 18px; height: 18px; border-radius: 50%; background: #eab308; }
+  .popup .label { font-size: 16px; font-weight: 600; }
+  .popup .dur { margin-left: auto; font-size: 12px; color: #9ca3af; }
+  .popup .detail { padding: 0 14px 6px; font-size: 12px; color: #b6bcc8; line-height: 1.4; }
+  .popup .sess { padding: 0 14px 10px; font-size: 11px; color: #6b7280; font-family: ui-monospace, monospace; }
+  .popup .row { display: flex; align-items: center; justify-content: space-between;
+                padding: 10px 14px; border-top: 1px solid #262b36; font-size: 13px; }
+  .switch { width: 34px; height: 20px; background: #22c55e; border-radius: 20px; position: relative; }
+  .switch::before { content: ""; position: absolute; width: 16px; height: 16px; right: 2px; top: 2px;
+                    border-radius: 50%; background: #e5e7eb; }
+  .popup .link { color: #8ab4f8; font-size: 12px; }
+</style>
+</head>
+<body>
+  <div class="copy">
+    <h1>Know what Claude&nbsp;Code is doing — without switching windows</h1>
+    <p>A stoplight for your coding agent: toolbar badge, floating overlay, and a
+       desktop notification the moment Claude needs you or finishes.</p>
+    <div class="legend">
+      <div class="item"><span class="dot g"></span> Working — running tools, generating</div>
+      <div class="item"><span class="dot y"></span> Needs you — permission prompt or question</div>
+      <div class="item"><span class="dot r"></span> Finished responding</div>
+      <div class="item"><span class="dot grey"></span> No active session</div>
+    </div>
+  </div>
+
+  <div class="window">
+    <div class="chrome-bar">
+      <div class="traffic">
+        <span style="background:#ff5f57"></span><span style="background:#febc2e"></span><span style="background:#28c840"></span>
+      </div>
+      <div class="urlbar">github.com/your/project/pull/128</div>
+      <div class="ext-icon">
+        <img src="../extension/icons/icon32.png" alt="">
+        <div class="badge"></div>
+      </div>
+    </div>
+    <div class="page">
+      <div class="skeleton" style="width:55%;height:22px"></div>
+      <div class="skeleton" style="width:90%;height:12px"></div>
+      <div class="skeleton" style="width:84%;height:12px"></div>
+      <div class="skeleton" style="width:88%;height:12px"></div>
+      <div class="skeleton" style="width:40%;height:12px"></div>
+      <div class="skeleton" style="width:92%;height:110px;margin-top:22px"></div>
+
+      <div class="stoplight">
+        <div class="lamp"></div>
+        <div class="lamp lit-y"></div>
+        <div class="lamp"></div>
+      </div>
+
+      <div class="popup">
+        <div class="header">
+          <div class="state-dot"></div>
+          <div class="label">Needs you</div>
+          <div class="dur">for 42s</div>
+        </div>
+        <div class="detail">Claude needs your permission to use Bash</div>
+        <div class="sess">session 7f3a9c21</div>
+        <div class="row"><span>Show overlay</span><span class="switch"></span></div>
+        <div class="row"><span class="link">Options</span></div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

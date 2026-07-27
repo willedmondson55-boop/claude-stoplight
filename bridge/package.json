@@ -1,0 +1,10 @@
+{
+  "name": "claude-stoplight-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local bridge between Claude Code hooks and the stoplight Chrome extension",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  }
+}

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Claude Code Stoplight — Options</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        max-width: 560px;
+        margin: 32px auto;
+        padding: 0 20px;
+        color: #1f2430;
+      }
+      h1 {
+        font-size: 20px;
+      }
+      label {
+        display: block;
+        font-weight: 600;
+        margin: 20px 0 6px;
+      }
+      .hint {
+        font-size: 12px;
+        color: #6b7280;
+        margin: 4px 0 0;
+        line-height: 1.5;
+      }
+      input[type="number"] {
+        width: 120px;
+        padding: 6px 8px;
+        font-size: 14px;
+      }
+      textarea {
+        width: 100%;
+        height: 120px;
+        padding: 8px;
+        font-size: 13px;
+        font-family: ui-monospace, monospace;
+        box-sizing: border-box;
+      }
+      button {
+        margin-top: 20px;
+        padding: 8px 18px;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      #status {
+        margin-left: 10px;
+        font-size: 13px;
+        color: #16a34a;
+      }
+      #status.error {
+        color: #dc2626;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Claude Code Stoplight</h1>
+
+    <label for="port">Bridge port</label>
+    <input type="number" id="port" min="1" max="65535" />
+    <p class="hint">
+      Default 4747. The extension ships with permission for
+      <code>http://127.0.0.1:4747</code> only — picking a different port will ask for an
+      extra permission on 127.0.0.1 when you save. Remember to start the bridge with
+      <code>STOPLIGHT_PORT=&lt;port&gt; npm start</code> to match.
+    </p>
+
+    <label for="sites">Overlay sites</label>
+    <textarea id="sites" spellcheck="false" placeholder="*"></textarea>
+    <p class="hint">
+      One hostname per line. The floating stoplight only appears on these sites.
+      <code>*</code> means every site; <code>github.com</code> also matches
+      <code>gist.github.com</code>. Leave empty to show the overlay nowhere (badge and
+      notifications still work).
+    </p>
+
+    <button id="save">Save</button><span id="status"></span>
+
+    <script src="shared.js"></script>
+    <script src="options.js"></script>
+  </body>
+</html>
