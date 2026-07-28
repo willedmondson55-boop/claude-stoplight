@@ -23,6 +23,15 @@ SESSION=$(extract session_id)
 MESSAGE=$(extract message)
 [ -n "$MESSAGE" ] && DETAIL="$MESSAGE"
 
+# A question dialog is Claude waiting on you, not Claude working: the
+# AskUserQuestion tool's PreToolUse would otherwise report green.
+if [ "$STATE" = "green" ] \
+  && [ "$(extract hook_event_name)" = "PreToolUse" ] \
+  && [ "$(extract tool_name)" = "AskUserQuestion" ]; then
+  STATE="yellow"
+  DETAIL="Claude is asking you a question"
+fi
+
 curl -s -X POST "http://127.0.0.1:${PORT}/state" \
   -H 'Content-Type: application/json' \
   --max-time 1 \
