@@ -127,5 +127,22 @@
     if (changes.overlayPos) applyPosition(changes.overlayPos.newValue);
   });
 
+  // When the extension reloads or updates, this script becomes an orphan cut
+  // off from storage events — its overlay would silently freeze at a stale
+  // color. Detect the severed context and remove the overlay instead; the
+  // page picks the live one back up on its next reload.
+  const orphanCheck = setInterval(() => {
+    let alive = false;
+    try {
+      alive = !!chrome.runtime?.id;
+    } catch {
+      alive = false;
+    }
+    if (!alive) {
+      clearInterval(orphanCheck);
+      unmount();
+    }
+  }, 5000);
+
   sync();
 })();
