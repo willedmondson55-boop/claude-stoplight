@@ -3,7 +3,7 @@
   "name": "Claude Code Stoplight",
   "version": "1.0.0",
   "description": "At-a-glance stoplight for your Claude Code session: green = working, yellow = needs you, red = done, grey = no session.",
-  "permissions": ["storage", "notifications", "offscreen", "alarms"],
+  "permissions": ["storage", "notifications", "alarms"],
   "host_permissions": ["http://127.0.0.1:4747/*"],
   "optional_host_permissions": ["http://127.0.0.1/*"],
   "background": {

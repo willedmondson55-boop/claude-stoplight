@@ -109,6 +109,12 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (req.method === 'GET' && url.pathname === '/clients') {
+    res.writeHead(200, { 'Content-Type': 'application/json', ...corsHeaders() });
+    res.end(JSON.stringify({ sseClients: sseClients.size }));
+    return;
+  }
+
   if (req.method === 'GET' && url.pathname === '/events') {
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
