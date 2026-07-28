@@ -23,6 +23,14 @@ SESSION=$(extract session_id)
 MESSAGE=$(extract message)
 [ -n "$MESSAGE" ] && DETAIL="$MESSAGE"
 
+# PermissionRequest and PreToolUse fire near-simultaneously and their async
+# reports race; delay the yellow so it always lands after the racing green.
+# If the prompt is really waiting on the user, nothing fires after it, so
+# yellow holds; if the tool was auto-approved, the next event self-corrects.
+if [ "$(extract hook_event_name)" = "PermissionRequest" ]; then
+  sleep 0.3
+fi
+
 # A question dialog is Claude waiting on you, not Claude working: the
 # AskUserQuestion tool's PreToolUse would otherwise report green.
 if [ "$STATE" = "green" ] \
