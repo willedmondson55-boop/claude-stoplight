@@ -38,12 +38,18 @@ function stopPolling() {
 }
 
 async function pollOnce() {
+  // AbortController timeout: in managed/proxied Chrome a blocked localhost
+  // request can hang forever rather than fail — treat >1.5s as unreachable.
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), 1500);
   try {
-    const res = await fetch(`${base()}/state`, { cache: 'no-store' });
+    const res = await fetch(`${base()}/state`, { cache: 'no-store', signal: abort.signal });
     if (!res.ok) throw new Error(res.status);
     send(await res.json());
   } catch {
     reportUnreachable();
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -60,7 +66,16 @@ function startPolling() {
 function connectSSE() {
   if (es) return;
   const candidate = new EventSource(`${base()}/events`);
+  // If the connection neither opens nor errors within 5s (hung by a proxy),
+  // give up on it and fall back to polling.
+  const connectWatchdog = setTimeout(() => {
+    if (es !== candidate) {
+      candidate.close();
+      startPolling();
+    }
+  }, 5000);
   candidate.onopen = () => {
+    clearTimeout(connectWatchdog);
     es = candidate;
     stopPolling();
     if (sseRetryTimer) clearInterval(sseRetryTimer);
