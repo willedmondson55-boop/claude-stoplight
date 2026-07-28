@@ -77,17 +77,11 @@ Upload package: `dist/claude-stoplight-1.0.0.zip`
       Shows a desktop notification when the session transitions to "needs your
       input" or "finished", which is the extension's core alerting feature.
 
-- `offscreen` —
-
-      Maintains the Server-Sent Events connection to the user's local bridge at
-      127.0.0.1. MV3 service workers are short-lived and cannot hold a
-      long-lived connection.
-
 - `alarms` —
 
-      A once-per-minute watchdog that recreates the offscreen document if the
-      browser discarded it and marks the state stale (grey) if no update has
-      arrived in 15 minutes.
+      A once-per-minute watchdog that restarts the service worker's polling of
+      the user's local bridge if the browser suspended it, and marks the state
+      stale (grey) if no update has arrived in 15 minutes.
 
 - Host permission `http://127.0.0.1:4747/*` —
 
