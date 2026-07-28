@@ -111,16 +111,21 @@ notifications for the yellow and red transitions.
 
 ## Extension architecture (and MV3 constraints)
 
-**Offscreen document holds the SSE connection.** MV3 service workers are killed
-after ~30s idle, so nothing long-lived can run there. The two viable designs were
-(a) poll from content scripts and message the worker, or (b) keep the connection in
-an offscreen document. Polling from content scripts fails the "badge always
-visible" requirement — with no matching tab open, nothing polls and the badge goes
-stale. The offscreen document lives independently of tabs, holds one `EventSource`,
-and messages the worker only when state changes (each message also wakes the
-worker). If SSE drops it falls back to polling `/state` every 2s and retries SSE
-every 30s. A 1-minute `chrome.alarms` watchdog recreates the offscreen document if
-Chrome discards it and forces grey if state goes stale.
+**The service worker polls the bridge directly.** MV3 workers are killed after
+~30s idle, so the worker keeps itself alive by touching a `chrome.storage` API on
+every 2-second poll tick (chrome API activity resets the idle timer), and a
+1-minute `chrome.alarms` watchdog restarts polling if Chrome kills the worker
+anyway — worst case the badge is ~1 minute stale after a worker death, typically
+it's live within 2 seconds. Polls carry a 1.5s abort timeout so a hung request
+(common behind corporate proxies) degrades to an explicit "bridge unreachable"
+grey instead of a silent stall.
+
+Design history: v1 held an SSE `EventSource` in an offscreen document (the
+textbook MV3 pattern for long-lived connections). In managed/enterprise Chrome
+the offscreen document's networking proved unreliable while service-worker
+fetches to 127.0.0.1 worked fine, so the offscreen layer was removed entirely —
+fewer moving parts, one less permission, and 2s polling against a loopback
+server is effectively free.
 
 The worker owns badge + notifications and writes each snapshot to
 `chrome.storage.local`; the popup and content-script overlay just react to
@@ -160,7 +165,6 @@ hooks/report-state.sh     hook → bridge reporter
 hooks/settings-snippet.json  paste-ready hooks config
 extension/manifest.json   MV3 manifest
 extension/background.js   service worker: badge, notifications, watchdog
-extension/offscreen.*     SSE connection holder
 extension/overlay.*       floating stoplight content script
 extension/popup.*         toolbar popup
 extension/options.*       port + site allowlist
