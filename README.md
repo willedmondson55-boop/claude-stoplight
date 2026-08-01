@@ -1,174 +1,150 @@
 # Claude Code Stoplight
 
-A Chrome extension + local bridge that shows what your Claude Code session is doing,
-at a glance, without switching windows.
+A Chrome extension that shows what your Claude Code session is doing at a glance —
+no window switching needed.
 
 | Light | Meaning |
 | --- | --- |
 | 🟢 Green | Claude Code is actively working (running tools, generating) |
 | 🟡 Yellow | Waiting on you (permission prompt, question, idle after asking) |
 | 🔴 Red | Task finished / stopped responding |
-| ⚪ Grey | No active session (or bridge unreachable / state stale) |
+| ⚪ Grey | No active session |
 
 You get four signals: a tinted toolbar badge, a small draggable stoplight overlay on
 web pages, a system notification on transitions into yellow/red, and a popup with
 detail + duration.
 
-## How it fits together
+## Quick Start
+
+1. **Install the extension** — load `extension/` as an unpacked extension
+   (`chrome://extensions` → Developer mode → Load unpacked)
+2. **Open the popup** — first launch shows a one-time onboarding screen with your
+   hooks config ready to copy
+3. **Paste into `~/.claude/settings.json`** — then restart Claude Code
+4. Done — the stoplight lights up automatically as Claude works
+
+No local server, no env vars, no scripts to install. The extension talks to a hosted
+server that relays state between Claude Code's hooks and the extension.
+
+## How it works
 
 ```
-Claude Code hooks ──curl──▶ bridge (127.0.0.1:4747) ──SSE/poll──▶ extension
-                                                                   ├─ badge
-                                                                   ├─ overlay
-                                                                   ├─ notifications
-                                                                   └─ popup
+Claude Code hooks ──curl──▶ hosted server ──poll──▶ Chrome extension
+(inline curl cmds)           /api/stoplight/*        ├─ badge
+                                                     ├─ overlay
+                                                     ├─ notifications
+                                                     └─ popup
 ```
 
-- `bridge/` — zero-dependency Node server. `POST /state`, `GET /state`, `GET /events`
-  (Server-Sent Events). Auto-expires to grey after 15 minutes without updates.
-- `hooks/` — reporter script + a `settings.json` snippet for Claude Code.
-- `extension/` — Manifest V3 extension, vanilla JS/CSS, no dependencies.
+Claude Code's hook system fires shell commands at key lifecycle events (session start,
+tool use, permission prompts, stop). The generated hooks config contains inline `curl`
+commands that POST state to the hosted server with a Bearer token. The extension polls
+that endpoint every 2 seconds and updates the badge/overlay/notifications.
 
-## Install
+## Extension Features
 
-### 1. Run the bridge
+- **Toolbar badge** — colored dot always visible, no click needed
+- **Floating overlay** — draggable stoplight on any web page (configurable allowlist)
+- **System notifications** — fires on transitions to yellow (needs you) or red (done)
+- **Popup** — shows state, detail text, duration timer, quick settings
+- **Onboarding** — first-run screen auto-generates your token and config
+- **Connectivity detection** — graceful handling of server unreachability
+
+## Architecture (MV3)
+
+The service worker polls the server every 2s. MV3 kills workers after ~30s idle, so
+the worker keeps itself alive by touching `chrome.storage` on every tick. A 1-minute
+`chrome.alarms` watchdog restarts polling if Chrome kills the worker anyway. Polls
+carry a 1.5s abort timeout — unreachable server degrades to grey silently.
+
+The popup and overlay read from `chrome.storage.onChanged` — they never touch the
+network directly.
+
+## Modes
+
+### Hosted mode (default)
+
+The extension auto-registers a token on first use and talks to the hosted server.
+Generated hooks use inline curl with Bearer auth. Zero local setup.
+
+### Local mode (advanced)
+
+For offline use or custom setups, enable "Use local bridge" in the options page.
+Run the bridge yourself:
 
 ```sh
-cd bridge
-npm start
+cd bridge && npm start
 ```
 
-It binds to `127.0.0.1:4747` only. Keep it running (a login item, tmux pane, or
-`launchd` job all work fine — it's a single ~150-line script).
+The bridge is a zero-dependency Node HTTP server (~130 lines) that binds to
+`127.0.0.1:4747`. It exposes `POST /state`, `GET /state`, `GET /events` (SSE),
+and auto-expires to grey after 15 minutes without updates.
 
-### 2. Load the extension
-
-1. Open `chrome://extensions`
-2. Enable **Developer mode** (top right)
-3. **Load unpacked** → select the `extension/` folder
-4. Pin the "Claude Code Stoplight" action to the toolbar
-
-The badge shows the current color immediately; the overlay appears on pages after a
-reload of those tabs (defaults to all sites — trim the list in Options).
-
-### 3. Wire up the Claude Code hooks
-
-This repo is expected at `~/claude-stoplight`. If you cloned it elsewhere, adjust
-the paths in the snippet.
-
-Merge `hooks/settings-snippet.json` into `~/.claude/settings.json` (create the file
-with just that content if you don't have one; if you already have a `"hooks"` key,
-merge the event entries into it). Then restart any running Claude Code sessions —
-hooks are captured at startup.
-
-The mapping:
+## Hook Events
 
 | Hook event | State | Why |
 | --- | --- | --- |
 | `SessionStart` | green | session came up |
 | `UserPromptSubmit` | green | you sent a prompt, Claude is working |
 | `PreToolUse` | green | about to run a tool |
-| `PostToolUse` | green | tool finished, still working (see note below) |
-| `Notification` | yellow | Claude is waiting on you |
+| `PostToolUse` | green | tool finished, still working |
+| `PermissionRequest` | yellow | permission prompt waiting |
+| `Notification` | yellow | Claude is waiting on you (filtered by matcher) |
 | `Stop` | red | Claude finished responding |
 | `SessionEnd` | grey | session closed |
 
-All hooks go through `hooks/report-state.sh`, which reads the hook payload on
-stdin, extracts `session_id` (and the human-readable `message` for notifications,
-shown in the popup/notification), and curls the bridge with `--max-time 1`, always
-exiting 0 — a dead bridge can never block or break Claude Code. The snippet also
-sets `"async": true` on every hook so Claude Code doesn't wait on them at all.
+The `Notification` hook uses a matcher to limit yellow to "needs you" types:
+`permission_prompt`, `idle_prompt`, `elicitation_dialog`, `agent_needs_input`.
 
-**Hook names verified against the current docs** (code.claude.com/docs/en/hooks).
-All six events you'd expect exist with exactly these names — nothing needed
-renaming. Two deliberate additions to the requested mapping:
+## Options Page
 
-- **`PostToolUse` → green.** Without it, approving a permission prompt leaves the
-  light stuck on yellow until the *next* tool call, because `PreToolUse` for the
-  approved tool has already fired. `PostToolUse` snaps it back to green as soon as
-  the tool completes.
-- **`Notification` matcher.** The Notification event also fires for things like
-  auth success. The snippet's matcher limits yellow to the "needs you" types:
-  `permission_prompt`, `idle_prompt`, `elicitation_dialog`, `agent_needs_input`.
+- **Overlay sites** — hostnames where the floating stoplight appears (`*` = everywhere)
+- **Notifications** — toggle system notifications on yellow/red
+- **Hooks config** — view/copy your generated config at any time
+- **Advanced: Local mode** — use a local bridge instead of hosted server
+- **Advanced: Port** — custom bridge port (default 4747)
 
-Semantics note: `Stop` fires at the end of *every* assistant response, so the light
-goes red each time Claude finishes a turn and green again when you reply. That
-matches "task finished / waiting for nothing in particular." If you'd rather treat
-post-turn idle as yellow, delete the `Stop` entry — the `idle_prompt` notification
-will turn the light yellow when Claude has been waiting on you for a while.
+## Verify Without a Real Session
 
-## Verify without a real session
-
-With the bridge running and the extension loaded:
+With the local bridge running:
 
 ```sh
 ./test-state.sh
 ```
 
-Walks the bridge through green → yellow → red (3s apart; pass a number for a
-different delay). You should see the badge and overlay change color and get system
-notifications for the yellow and red transitions.
-
-## Extension architecture (and MV3 constraints)
-
-**The service worker polls the bridge directly.** MV3 workers are killed after
-~30s idle, so the worker keeps itself alive by touching a `chrome.storage` API on
-every 2-second poll tick (chrome API activity resets the idle timer), and a
-1-minute `chrome.alarms` watchdog restarts polling if Chrome kills the worker
-anyway — worst case the badge is ~1 minute stale after a worker death, typically
-it's live within 2 seconds. Polls carry a 1.5s abort timeout so a hung request
-(common behind corporate proxies) degrades to an explicit "bridge unreachable"
-grey instead of a silent stall.
-
-Design history: v1 held an SSE `EventSource` in an offscreen document (the
-textbook MV3 pattern for long-lived connections). In managed/enterprise Chrome
-the offscreen document's networking proved unreliable while service-worker
-fetches to 127.0.0.1 worked fine, so the offscreen layer was removed entirely —
-fewer moving parts, one less permission, and 2s polling against a loopback
-server is effectively free.
-
-The worker owns badge + notifications and writes each snapshot to
-`chrome.storage.local`; the popup and content-script overlay just react to
-`storage.onChanged` — page contexts never touch the network, so the only host
-permission is `http://127.0.0.1:4747/*`. Notifications fire only on *transitions*
-into yellow/red (previous state is compared in the worker). `chrome.action.openPopup`
-is never called — it requires a user gesture; notifications + overlay cover the
-"interrupt me" path.
-
-The content script is registered for http/https pages but exits immediately unless
-the page's hostname matches the allowlist you set in Options (runtime gating —
-`host_permissions` itself stays limited to the bridge).
-
-## Options
-
-- **Bridge port** — default 4747. Changing it prompts for an optional
-  `http://127.0.0.1/*` permission (the install-time grant covers only 4747). Start
-  the bridge with `STOPLIGHT_PORT=<port> npm start` to match, and export
-  `STOPLIGHT_PORT` where Claude Code runs so the hook script posts to the same port.
-- **Overlay sites** — hostnames (one per line) where the floating stoplight
-  appears. `*` = everywhere; `github.com` also matches subdomains. The badge and
-  notifications work regardless.
-- **Show overlay** — quick toggle in the popup.
+Walks the bridge through green → yellow → red (3s apart). You should see the badge
+and overlay change color.
 
 ## Privacy
 
-Everything stays on your machine. The extension's only network access is to the
-bridge you run yourself on `127.0.0.1`; it collects no data, has no analytics, and
-contacts no external servers. Unofficial project — not affiliated with or endorsed
-by Anthropic.
+The extension only communicates with the hosted server (or your local bridge). It
+collects no data, has no analytics, and stores nothing beyond your session token and
+preferences in `chrome.storage.local`. Unofficial project — not affiliated with or
+endorsed by Anthropic.
 
 ## Files
 
 ```
-bridge/server.js          the bridge (Node built-ins only)
-hooks/report-state.sh     hook → bridge reporter
-hooks/settings-snippet.json  paste-ready hooks config
-extension/manifest.json   MV3 manifest
-extension/background.js   service worker: badge, notifications, watchdog
-extension/overlay.*       floating stoplight content script
-extension/popup.*         toolbar popup
-extension/options.*       port + site allowlist
-tools/gen-icons.js        regenerates extension/icons/*.png
-store-assets/             Chrome Web Store listing pack
-test-state.sh             green → yellow → red demo
+extension/                Chrome extension (MV3, vanilla JS, no dependencies)
+  manifest.json           MV3 manifest
+  background.js           Service worker: polling, badge, notifications, watchdog
+  shared.js               Shared constants across all extension contexts
+  overlay.js / .css       Floating draggable stoplight content script
+  popup.html / .js        Toolbar popup (onboarding + status + settings tabs)
+  options.html / .js      Full settings page
+  icons/                  Generated PNGs
+
+bridge/                   Local bridge (zero-dependency Node server)
+  server.js               The entire bridge (~130 lines)
+  package.json            npm start convenience
+
+hooks/                    Claude Code hook helpers
+  report-state.sh         Dual-mode reporter (local/hosted, stdin JSON parsing)
+  settings-snippet.json   Paste-ready hooks config (uses report-state.sh)
+
+tools/
+  gen-icons.js            Regenerate extension/icons/*.png
+
+store-assets/             Chrome Web Store listing materials
+test-state.sh             green → yellow → red demo (local bridge)
 ```

@@ -42,7 +42,7 @@ function notifyTransition(state, detail) {
 }
 
 async function applyState(snapshot) {
-  const { current } = await chrome.storage.local.get('current');
+  const { current, settings } = await chrome.storage.local.get(['current', 'settings']);
   const prevState = current?.state;
   const changed =
     snapshot.state !== prevState ||
@@ -53,7 +53,8 @@ async function applyState(snapshot) {
   if (changed) await chrome.storage.local.set({ current: snapshot });
 
   // Notify only on transitions INTO yellow/red, never on repeats.
-  if (snapshot.state !== prevState && (snapshot.state === 'yellow' || snapshot.state === 'red')) {
+  const notificationsEnabled = settings?.notifications !== false;
+  if (notificationsEnabled && snapshot.state !== prevState && (snapshot.state === 'yellow' || snapshot.state === 'red')) {
     notifyTransition(snapshot.state, snapshot.detail);
   }
 }
@@ -61,12 +62,23 @@ async function applyState(snapshot) {
 async function pollOnce() {
   const { settings } = await chrome.storage.local.get('settings');
   const port = settings?.port || STOPLIGHT_DEFAULTS.port;
+  const hostedUrl = settings?.hostedUrl || STOPLIGHT_DEFAULTS.hostedUrl;
+  const hostedToken = settings?.hostedToken || '';
+  const useLocal = settings?.useLocal || false;
   // The storage read above doubles as the keepalive: touching a chrome.* API
   // every tick resets the worker's idle shutdown timer.
+
+  // Determine the poll URL: local bridge or hosted server
+  const pollUrl = useLocal
+    ? `http://127.0.0.1:${port}/state`
+    : hostedUrl && hostedToken
+      ? `${hostedUrl.replace(/\/$/, '')}/api/stoplight/state/${hostedToken}`
+      : `http://127.0.0.1:${port}/state`;
+
   const abort = new AbortController();
   const timer = setTimeout(() => abort.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(`http://127.0.0.1:${port}/state`, {
+    const res = await fetch(pollUrl, {
       cache: 'no-store',
       signal: abort.signal,
     });
@@ -76,7 +88,7 @@ async function pollOnce() {
     await applyState({
       state: 'grey',
       session: null,
-      detail: 'bridge unreachable',
+      detail: 'no active session',
       since: Date.now(),
       updatedAt: Date.now(),
     });
@@ -105,7 +117,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     await applyState({
       ...current,
       state: 'grey',
-      detail: 'stale (no updates for 15 minutes)',
+      detail: 'no active session',
       since: Date.now(),
       updatedAt: current.updatedAt,
     });

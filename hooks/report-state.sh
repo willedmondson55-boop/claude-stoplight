@@ -4,6 +4,11 @@
 # Reads the hook's JSON payload on stdin to pick up session_id and, for
 # Notification events, the human-readable message.
 # Must never block or break Claude Code: short timeouts, always exit 0.
+#
+# Modes:
+#   Local (default): posts to http://127.0.0.1:$STOPLIGHT_PORT/state
+#   Hosted: if STOPLIGHT_URL and STOPLIGHT_TOKEN are set, posts to the
+#           hosted server instead (e.g. https://mentro-lucid-dust-3580.fly.dev)
 
 STATE="$1"
 DETAIL="${2:-}"
@@ -40,10 +45,22 @@ if [ "$STATE" = "green" ] \
   DETAIL="Claude is asking you a question"
 fi
 
-curl -s -X POST "http://127.0.0.1:${PORT}/state" \
-  -H 'Content-Type: application/json' \
-  --max-time 1 \
-  -d "{\"state\":\"${STATE}\",\"session\":\"${SESSION}\",\"detail\":\"${DETAIL}\"}" \
-  >/dev/null 2>&1 || true
+# ── Dispatch: hosted or local ──────────────────────────────────────────────
+if [ -n "$STOPLIGHT_URL" ] && [ -n "$STOPLIGHT_TOKEN" ]; then
+  # Hosted mode — POST to remote server with Bearer auth
+  curl -s -X POST "${STOPLIGHT_URL}/api/stoplight/state" \
+    -H 'Content-Type: application/json' \
+    -H "Authorization: Bearer ${STOPLIGHT_TOKEN}" \
+    --max-time 3 \
+    -d "{\"state\":\"${STATE}\",\"session\":\"${SESSION}\",\"detail\":\"${DETAIL}\"}" \
+    >/dev/null 2>&1 || true
+else
+  # Local mode — POST to localhost bridge
+  curl -s -X POST "http://127.0.0.1:${PORT}/state" \
+    -H 'Content-Type: application/json' \
+    --max-time 1 \
+    -d "{\"state\":\"${STATE}\",\"session\":\"${SESSION}\",\"detail\":\"${DETAIL}\"}" \
+    >/dev/null 2>&1 || true
+fi
 
 exit 0

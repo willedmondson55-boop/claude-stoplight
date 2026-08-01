@@ -63,7 +63,7 @@ function setState(state, session, detail) {
 // Auto-expire to grey when nothing has reported for a while.
 setInterval(() => {
   if (current.state !== 'grey' && Date.now() - current.updatedAt > EXPIRY_MS) {
-    setState('grey', null, 'expired (no updates for 15 minutes)');
+    setState('grey', null, 'no active session');
   }
 }, 30 * 1000).unref();
 

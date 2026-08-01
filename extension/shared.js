@@ -3,6 +3,9 @@
 
 const STOPLIGHT_DEFAULTS = {
   port: 4747,
+  hostedUrl: 'https://mentro-lucid-dust-3580.fly.dev',
+  hostedToken: '',
+  notifications: true,
   overlayVisible: true,
   // Site allowlist for the overlay. Entries are hostname suffixes
   // ("github.com" matches gist.github.com too). "*" means every site.

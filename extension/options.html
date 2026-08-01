@@ -2,22 +2,29 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>Claude Code Stoplight — Options</title>
+    <title>Claude Code Stoplight — Settings</title>
     <style>
       body {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         max-width: 560px;
         margin: 32px auto;
         padding: 0 20px;
-        color: #1f2430;
+        background: #14171f;
+        color: #e5e7eb;
       }
       h1 {
         font-size: 20px;
+        margin-bottom: 4px;
       }
-      label {
-        display: block;
-        font-weight: 600;
-        margin: 20px 0 6px;
+      h2 {
+        font-size: 16px;
+        margin-top: 28px;
+        color: #e5e7eb;
+      }
+      .subtitle {
+        font-size: 14px;
+        color: #9ca3af;
+        margin-top: 0;
       }
       .hint {
         font-size: 12px;
@@ -25,10 +32,11 @@
         margin: 4px 0 0;
         line-height: 1.5;
       }
-      input[type="number"] {
-        width: 120px;
-        padding: 6px 8px;
-        font-size: 14px;
+      .hint code {
+        background: #262b36;
+        padding: 1px 4px;
+        border-radius: 3px;
+        font-size: 11px;
       }
       textarea {
         width: 100%;
@@ -37,45 +45,192 @@
         font-size: 13px;
         font-family: ui-monospace, monospace;
         box-sizing: border-box;
+        background: #1c2029;
+        border: 1px solid #3a4050;
+        border-radius: 4px;
+        color: #e5e7eb;
+      }
+      textarea:focus {
+        outline: none;
+        border-color: #8ab4f8;
+      }
+      input[type="number"] {
+        width: 120px;
+        padding: 6px 8px;
+        font-size: 14px;
+        background: #1c2029;
+        border: 1px solid #3a4050;
+        border-radius: 4px;
+        color: #e5e7eb;
+      }
+      input[type="number"]:focus {
+        outline: none;
+        border-color: #8ab4f8;
       }
       button {
-        margin-top: 20px;
         padding: 8px 18px;
         font-size: 14px;
         cursor: pointer;
+        border-radius: 4px;
+        border: 1px solid #3a4050;
+        background: #262b36;
+        color: #e5e7eb;
+      }
+      button:hover {
+        background: #3a4050;
       }
       #status {
+        display: inline-block;
         margin-left: 10px;
         font-size: 13px;
-        color: #16a34a;
+        color: #22c55e;
       }
       #status.error {
-        color: #dc2626;
+        color: #ef4444;
+      }
+      .config-section {
+        margin: 24px 0;
+        padding: 16px;
+        background: #1c2029;
+        border: 1px solid #262b36;
+        border-radius: 8px;
+      }
+      .config-title {
+        font-weight: 600;
+        font-size: 14px;
+        margin-bottom: 8px;
+        color: #e5e7eb;
+      }
+      .config-output {
+        width: 100%;
+        height: 220px;
+        padding: 8px;
+        font-size: 11px;
+        font-family: ui-monospace, monospace;
+        box-sizing: border-box;
+        background: #14171f;
+        border: 1px solid #3a4050;
+        border-radius: 4px;
+        color: #e5e7eb;
+        resize: vertical;
+      }
+      .config-output:focus {
+        outline: none;
+        border-color: #8ab4f8;
+      }
+      .connected {
+        display: inline-block;
+        padding: 4px 10px;
+        background: rgba(34, 197, 94, 0.15);
+        color: #22c55e;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 500;
+      }
+      .settings-section {
+        margin-top: 32px;
+        padding-top: 24px;
+        border-top: 1px solid #262b36;
+      }
+      label {
+        color: #b6bcc8;
+        font-size: 13px;
+      }
+      .checkbox-label {
+        font-weight: normal;
+        margin: 12px 0;
+        cursor: pointer;
+        display: block;
+        color: #e5e7eb;
+      }
+      .checkbox-label input[type="checkbox"] {
+        margin-right: 8px;
+      }
+      .advanced-toggle {
+        font-size: 13px;
+        color: #6b7280;
+        cursor: pointer;
+        margin-top: 24px;
+        user-select: none;
+      }
+      .advanced-toggle:hover {
+        color: #b6bcc8;
+      }
+      .advanced-section {
+        margin-top: 12px;
+        padding: 16px;
+        background: #1c2029;
+        border: 1px solid #262b36;
+        border-radius: 8px;
+        display: none;
       }
     </style>
   </head>
   <body>
     <h1>Claude Code Stoplight</h1>
+    <p class="subtitle">See what Claude Code is doing at a glance — no window switching.</p>
 
-    <label for="port">Bridge port</label>
-    <input type="number" id="port" min="1" max="65535" />
-    <p class="hint">
-      Default 4747. The extension ships with permission for
-      <code>http://127.0.0.1:4747</code> only — picking a different port will ask for an
-      extra permission on 127.0.0.1 when you save. Remember to start the bridge with
-      <code>STOPLIGHT_PORT=&lt;port&gt; npm start</code> to match.
-    </p>
+    <div id="connected-banner" style="display:none; margin-top:16px;">
+      <span class="connected">✓ Connected</span>
+      <span id="connected-detail" style="font-size:12px; color:#6b7280; margin-left:8px;"></span>
+    </div>
 
-    <label for="sites">Overlay sites</label>
-    <textarea id="sites" spellcheck="false" placeholder="*"></textarea>
-    <p class="hint">
-      One hostname per line. The floating stoplight only appears on these sites.
-      <code>*</code> means every site; <code>github.com</code> also matches
-      <code>gist.github.com</code>. Leave empty to show the overlay nowhere (badge and
-      notifications still work).
-    </p>
+    <div class="config-section">
+      <div class="config-title">Hooks config for ~/.claude/settings.json</div>
+      <p class="hint" style="font-size:13px; margin-bottom:12px;">
+        Paste this into <code>~/.claude/settings.json</code>, then restart Claude Code.
+        Works on any OS — no env vars or scripts needed.
+      </p>
+      <textarea class="config-output" id="configOutput" readonly></textarea>
+      <div style="margin-top:8px;">
+        <button type="button" id="copyConfig">Copy to clipboard</button>
+        <span id="status"></span>
+      </div>
+    </div>
 
-    <button id="save">Save</button><span id="status"></span>
+    <div class="settings-section">
+      <h2>Settings</h2>
+
+      <label for="sites">Overlay sites</label>
+      <textarea id="sites" spellcheck="false" placeholder="*"></textarea>
+      <p class="hint">
+        One hostname per line. The floating stoplight only appears on these sites.
+        <code>*</code> means every site; <code>github.com</code> also matches
+        <code>gist.github.com</code>. Leave empty to disable the overlay (badge and
+        notifications still work).
+      </p>
+
+      <label class="checkbox-label">
+        <input type="checkbox" id="notifications" checked />
+        Browser notifications on yellow/red transitions
+      </label>
+      <p class="hint">
+        Get a system notification whenever Claude needs you or finishes.
+      </p>
+
+      <div style="margin-top:16px;">
+        <button id="saveSettings">Save settings</button>
+      </div>
+
+      <div class="advanced-toggle" id="advancedToggle">▶ Advanced options</div>
+      <div class="advanced-section" id="advancedSection">
+        <label class="checkbox-label">
+          <input type="checkbox" id="useLocal" />
+          Use local bridge instead of hosted server
+        </label>
+        <p class="hint" style="margin-bottom:12px;">
+          Run your own bridge on localhost instead of the hosted server. You'll need to
+          start the bridge yourself with <code>cd bridge && npm start</code>.
+        </p>
+
+        <label for="port">Bridge port</label>
+        <input type="number" id="port" min="1" max="65535" value="4747" />
+        <p class="hint">
+          Default 4747. Change this if your bridge runs on a different port.
+          Start the bridge with <code>STOPLIGHT_PORT=&lt;port&gt; npm start</code> to match.
+        </p>
+      </div>
+    </div>
 
     <script src="shared.js"></script>
     <script src="options.js"></script>
